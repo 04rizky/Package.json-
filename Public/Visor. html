@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor Link Unit 201</title>
+<link rel="stylesheet" href="visor.css">
+</head>
+<body>
+<h1>Visor Link Unit 201</h1>
+
+<div class="visor" id="v" role="img" aria-label="Tampilan HUD dari dalam visor helm Unit 201">
+  <div class="bg">
+    <video id="cam" autoplay playsinline muted></video>
+    <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b3f45"/><stop offset=".65" stop-color="#8a6a4a"/><stop offset="1" stop-color="#c58b4a"/></linearGradient></defs>
+      <rect width="160" height="90" fill="url(#s)"/>
+      <polygon points="0,56 14,50 26,53 40,42 56,50 70,46 88,54 108,40 126,50 144,45 160,52 160,90 0,90" fill="#4a4036"/>
+      <polygon points="0,68 24,63 48,67 76,62 104,66 132,63 160,67 160,90 0,90" fill="#2f2a24"/>
+      <rect x="92" y="48" width="10" height="16" fill="#3a332b"/><rect x="44" y="52" width="7" height="12" fill="#3a332b"/>
+    </svg>
+  </div>
+  <canvas class="th" id="th" width="160" height="90"></canvas>
+  <div class="tint"></div>
+  <canvas class="mo" id="mo" width="160" height="90"></canvas>
+
+  <svg class="frame" viewBox="0 0 160 90" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#0b0d0a" fill-rule="evenodd" d="M0 0H160V90H0Z M14 10 Q80 0 146 10 Q155 45 141 80 Q80 90 19 80 Q5 45 14 10Z"/>
+    <path fill="none" stroke="#e8941a" stroke-width=".7" opacity=".75" d="M14 10 Q80 0 146 10 Q155 45 141 80 Q80 90 19 80 Q5 45 14 10Z"/>
+  </svg>
+
+  <div class="box cmp" id="cmp">HDG 042</div>
+
+  <div class="box tl">
+    <h2>PENILAIAN</h2>
+    <div class="row"><span>STATUS</span><b id="st" class="ok">SIAGA</b></div>
+    <div class="row"><span>ANCAMAN</span><b id="th">0 TERDETEKSI</b></div>
+    <div class="row"><span>SEKTOR</span><b id="sec">B4</b></div>
+    <div class="row"><span>OPTIK</span><b id="opt">BIASA</b></div>
+    <div class="row"><span>GERAKAN</span><b id="mv">OFF</b></div>
+    <div class="row"><span>GOYANGAN</span><b id="sw">STABIL</b></div>
+  </div>
+
+  <div class="box tr">
+    <h2 id="ut">UNIT 201</h2>
+    <div id="tg">TARGET 04: TERKUNCI</div>
+    <div class="row"><span>JARAK</span><b id="dist">820 m</b></div>
+  </div>
+
+  <div class="box map"><canvas id="rd" width="200" height="200" aria-label="Peta radar"></canvas></div>
+
+  <svg class="ret" viewBox="-50 -50 100 100" aria-hidden="true">
+    <circle r="40"/>
+    <g id="sway">
+      <circle class="dot" r="1.8"/>
+      <line x1="-48" y1="0" x2="-8" y2="0"/><line x1="8" y1="0" x2="48" y2="0"/>
+      <line x1="0" y1="8" x2="0" y2="48"/>
+      <line x1="-4" y1="18" x2="4" y2="18"/><line x1="-6" y1="28" x2="6" y2="28"/><line x1="-8" y1="38" x2="8" y2="38"/>
+      <text x="10" y="20">100</text><text x="12" y="30">200</text><text x="14" y="40">300</text>
+    </g>
+  </svg>
+  <div class="lock" id="lk"><span>T-04</span></div>
+
+  <div class="box lg">
+    <h2>LOGISTIK</h2>
+    <div class="row"><span>AMUNISI</span><b id="am">24 / 30</b></div><div class="bar" id="amb"><i></i></div>
+    <div class="row"><span>GRANAT</span><b id="gr">3</b></div><div class="bar" id="grb"><i></i></div>
+    <div class="row"><span>INTI DAYA</span><b id="pw">68%</b></div><div class="bar" id="pwb"><i></i></div>
+    <div class="row"><span>SUPLAI AIR</span><b id="wt">74%</b></div><div class="bar" id="wtb"><i></i></div>
+    <div id="al" class="alert blink" style="visibility:hidden">AMUNISI: RENDAH</div>
+  </div>
+
+  <div class="box sq">
+    <h2>REGU</h2>
+    <div class="row"><span>UNIT 07</span><b class="ok">OK</b></div>
+    <div class="row"><span>UNIT 08</span><b class="ok">OK</b></div>
+    <div class="row"><span>UNIT 09</span><b id="u9" class="mid">BERGERAK</b></div>
+  </div>
+
+  <div class="box pf" id="pf"><div class="av" id="pav"></div><div class="pt"><b id="pnm">TIDAK ADA KONTAK</b><div id="prl">-</div><div class="row"><span id="pvc">MASUK AUDIO</span><span id="png">-</span></div></div></div>
+
+  <div class="box msg" id="msg">LEGIUN 2: radio tersambung.</div>
+</div>
+
+<div class="controls">
+  <button id="bCam" aria-pressed="false">Kamera latar</button>
+  <button id="bNight" aria-pressed="false">Mode malam</button>
+  <button id="bIR" aria-pressed="false">Infra merah</button>
+  <button id="bMo" aria-pressed="false">Sensor gerak</button>
+  <button id="bFight" aria-pressed="false">Mode tempur</button>
+  <button id="bMic" aria-pressed="false" disabled>Matikan mikrofon</button>
+  <button id="bFlip" disabled>Balik kamera</button>
+  <button id="bDemo">Demo kontak suara</button>
+  <button id="bFull">Layar penuh</button>
+</div>
+<div class="controls" id="join">
+  <input id="uname" placeholder="Nama unit (contoh: Unit 07)" maxlength="16" aria-label="Nama unit">
+  <input id="uroom" value="LEGIUN2" maxlength="16" aria-label="Kode ruangan">
+  <input id="uphoto" type="file" accept="image/*" aria-label="Foto profil">
+  <select id="urole" aria-label="Peran"><option>Penembak</option><option>Artileri</option><option>Medis</option><option>Radio</option><option>Pengintai</option><option>Komandan</option><option>Drone</option></select>
+  <button id="bLink">Sambung ke helm teman</button>
+</div>
+<div class="controls" id="thumbs"></div>
+<p class="note">Data di layar masih simulasi. Infra merah adalah efek warna dari kecerahan kamera (bukan panas sungguhan), dan sensor gerak mendeteksi perubahan gambar kamera. Putar HP ke landscape dan pakai layar penuh.</p>
+
+<script src="visor.js"></script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Visor Link Unit 201</title>
+<link rel="stylesheet" href="visor.css">
+</head>
+<body>
+<h1>Visor Link Unit 201</h1>
+
+<div class="visor" id="v" role="img" aria-label="Tampilan HUD dari dalam visor helm Unit 201">
+  <div class="bg">
+    <video id="cam" autoplay playsinline muted></video>
+    <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b3f45"/><stop offset=".65" stop-color="#8a6a4a"/><stop offset="1" stop-color="#c58b4a"/></linearGradient></defs>
+      <rect width="160" height="90" fill="url(#s)"/>
+      <polygon points="0,56 14,50 26,53 40,42 56,50 70,46 88,54 108,40 126,50 144,45 160,52 160,90 0,90" fill="#4a4036"/>
+      <polygon points="0,68 24,63 48,67 76,62 104,66 132,63 160,67 160,90 0,90" fill="#2f2a24"/>
+      <rect x="92" y="48" width="10" height="16" fill="#3a332b"/><rect x="44" y="52" width="7" height="12" fill="#3a332b"/>
+    </svg>
+  </div>
+  <canvas class="th" id="th" width="160" height="90"></canvas>
+  <div class="tint"></div>
+  <canvas class="mo" id="mo" width="160" height="90"></canvas>
+
+  <svg class="frame" viewBox="0 0 160 90" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#0b0d0a" fill-rule="evenodd" d="M0 0H160V90H0Z M14 10 Q80 0 146 10 Q155 45 141 80 Q80 90 19 80 Q5 45 14 10Z"/>
+    <path fill="none" stroke="#e8941a" stroke-width=".7" opacity=".75" d="M14 10 Q80 0 146 10 Q155 45 141 80 Q80 90 19 80 Q5 45 14 10Z"/>
+  </svg>
+
+  <div class="box cmp" id="cmp">HDG 042</div>
+
+  <div class="box tl">
+    <h2>PENILAIAN</h2>
+    <div class="row"><span>STATUS</span><b id="st" class="ok">SIAGA</b></div>
+    <div class="row"><span>ANCAMAN</span><b id="th">0 TERDETEKSI</b></div>
+    <div class="row"><span>SEKTOR</span><b id="sec">B4</b></div>
+    <div class="row"><span>OPTIK</span><b id="opt">BIASA</b></div>
+    <div class="row"><span>GERAKAN</span><b id="mv">OFF</b></div>
+    <div class="row"><span>GOYANGAN</span><b id="sw">STABIL</b></div>
+  </div>
+
+  <div class="box tr">
+    <h2 id="ut">UNIT 201</h2>
+    <div id="tg">TARGET 04: TERKUNCI</div>
+    <div class="row"><span>JARAK</span><b id="dist">820 m</b></div>
+  </div>
+
+  <div class="box map"><canvas id="rd" width="200" height="200" aria-label="Peta radar"></canvas></div>
+
+  <svg class="ret" viewBox="-50 -50 100 100" aria-hidden="true">
+    <circle r="40"/>
+    <g id="sway">
+      <circle class="dot" r="1.8"/>
+      <line x1="-48" y1="0" x2="-8" y2="0"/><line x1="8" y1="0" x2="48" y2="0"/>
+      <line x1="0" y1="8" x2="0" y2="48"/>
+      <line x1="-4" y1="18" x2="4" y2="18"/><line x1="-6" y1="28" x2="6" y2="28"/><line x1="-8" y1="38" x2="8" y2="38"/>
+      <text x="10" y="20">100</text><text x="12" y="30">200</text><text x="14" y="40">300</text>
+    </g>
+  </svg>
+  <div class="lock" id="lk"><span>T-04</span></div>
+
+  <div class="box lg">
+    <h2>LOGISTIK</h2>
+    <div class="row"><span>AMUNISI</span><b id="am">24 / 30</b></div><div class="bar" id="amb"><i></i></div>
+    <div class="row"><span>GRANAT</span><b id="gr">3</b></div><div class="bar" id="grb"><i></i></div>
+    <div class="row"><span>INTI DAYA</span><b id="pw">68%</b></div><div class="bar" id="pwb"><i></i></div>
+    <div class="row"><span>SUPLAI AIR</span><b id="wt">74%</b></div><div class="bar" id="wtb"><i></i></div>
+    <div id="al" class="alert blink" style="visibility:hidden">AMUNISI: RENDAH</div>
+  </div>
+
+  <div class="box sq">
+    <h2>REGU</h2>
+    <div class="row"><span>UNIT 07</span><b class="ok">OK</b></div>
+    <div class="row"><span>UNIT 08</span><b class="ok">OK</b></div>
+    <div class="row"><span>UNIT 09</span><b id="u9" class="mid">BERGERAK</b></div>
+  </div>
+
+  <div class="box pf" id="pf"><div class="av" id="pav"></div><div class="pt"><b id="pnm">TIDAK ADA KONTAK</b><div id="prl">-</div><div class="row"><span id="pvc">MASUK AUDIO</span><span id="png">-</span></div></div></div>
+
+  <div class="box msg" id="msg">LEGIUN 2: radio tersambung.</div>
+</div>
+
+<div class="controls">
+  <button id="bCam" aria-pressed="false">Kamera latar</button>
+  <button id="bNight" aria-pressed="false">Mode malam</button>
+  <button id="bIR" aria-pressed="false">Infra merah</button>
+  <button id="bMo" aria-pressed="false">Sensor gerak</button>
+  <button id="bFight" aria-pressed="false">Mode tempur</button>
+  <button id="bMic" aria-pressed="false" disabled>Matikan mikrofon</button>
+  <button id="bFlip" disabled>Balik kamera</button>
+  <button id="bDemo">Demo kontak suara</button>
+  <button id="bFull">Layar penuh</button>
+</div>
+<div class="controls" id="join">
+  <input id="uname" placeholder="Nama unit (contoh: Unit 07)" maxlength="16" aria-label="Nama unit">
+  <input id="uroom" value="LEGIUN2" maxlength="16" aria-label="Kode ruangan">
+  <input id="uphoto" type="file" accept="image/*" aria-label="Foto profil">
+  <select id="urole" aria-label="Peran"><option>Penembak</option><option>Artileri</option><option>Medis</option><option>Radio</option><option>Pengintai</option><option>Komandan</option><option>Drone</option></select>
+  <button id="bLink">Sambung ke helm teman</button>
+</div>
+<div class="controls" id="thumbs"></div>
+<p class="note">Data di layar masih simulasi. Infra merah adalah efek warna dari kecerahan kamera (bukan panas sungguhan), dan sensor gerak mendeteksi perubahan gambar kamera. Putar HP ke landscape dan pakai layar penuh.</p>
+
+<script src="visor.js"></script>
+</body>
+</html>
