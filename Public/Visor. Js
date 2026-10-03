@@ -1,0 +1,302 @@
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var v=$('v'), fight=false, hdg=42, ammo=24, gren=3, power=68, water=74, tick=0;
+  var msgs=['LEGIUN 2: radio tersambung.','UNIT 07: sektor B4 bersih.','UNIT 09: bergerak ke titik C2.','KOMANDO: tetap waspada, jaga formasi.','UNIT 08: butuh pasokan amunisi.'];
+  var blips=[];
+  for(var i=0;i<7;i++) blips.push({a:Math.random()*6.28,r:.25+Math.random()*.65,h:i<2,s:(Math.random()-.5)*.004});
+
+  function bar(id,val,max,lowAt){
+    var e=$(id); e.firstElementChild.style.width=Math.max(0,Math.min(100,val/max*100))+'%';
+    e.classList.toggle('low',val/max<lowAt);
+  }
+  function pad(n){n=((n%360)+360)%360;return String(Math.round(n)).padStart(3,'0')}
+  function update(){
+    hdg=(hdg+(fight?9:3)*(Math.random()>.4?1:-1)+360)%360;
+    $('cmp').textContent=pad(hdg-20)+'  '+pad(hdg-10)+'  ['+pad(hdg)+']  '+pad(hdg+10)+'  '+pad(hdg+20);
+    if(fight && tick%2===0){ammo=ammo>0?ammo-1:30; if(ammo===30&&gren>0&&Math.random()>.7)gren--;}
+    if(tick%6===0){power=Math.max(12,power-1);water=Math.max(10,water-1);}
+    var hostile=blips.filter(function(b){return b.h}).length+(fight?2:0);
+    $('th').textContent=hostile+' TERDETEKSI';
+    var crit=ammo<8||power<30||hostile>=4, st=$('st');
+    st.textContent=crit?'KRITIS':(hostile>0?'WASPADA':'SIAGA'); st.className=crit?'alert':(hostile>0?'mid':'ok');
+    $('am').textContent=ammo+' / 30'; $('gr').textContent=gren; $('pw').textContent=power+'%'; $('wt').textContent=water+'%';
+    bar('amb',ammo,30,.27); bar('grb',gren,4,.3); bar('pwb',power,100,.3); bar('wtb',water,100,.25);
+    $('al').style.visibility=ammo<8?'visible':'hidden';
+    var d=Math.round((fight?300:700)+Math.random()*300);
+    $('dist').textContent=d+' m'; $('sec').textContent=['B4','C2','A7','D1'][Math.floor(tick/8)%4];
+    $('u9').textContent=fight?'MENEMBAK':'BERGERAK';
+    var lk=$('lk'); lk.style.left=(52+Math.random()*12)+'%'; lk.style.top=(34+Math.random()*12)+'%';
+    $('tg').textContent='TARGET 04: '+(fight?'TERKUNCI':'DIPANTAU');
+    if(tick%6===0) $('msg').textContent=msgs[Math.floor(tick/6)%msgs.length];
+    tick++;
+  }
+
+  var cv=$('rd'), g=cv.getContext('2d'), sw=0, still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function radar(){
+    applySway(); var W=200,c=100; g.clearRect(0,0,W,W);
+    g.fillStyle='rgba(0,22,8,.55)'; g.beginPath(); g.arc(c,c,98,0,6.283); g.fill();
+    g.strokeStyle='rgba(124,255,154,.5)'; g.lineWidth=1;
+    [32,65,98].forEach(function(r){g.beginPath();g.arc(c,c,r,0,6.283);g.stroke()});
+    g.beginPath(); g.moveTo(c,2); g.lineTo(c,198); g.moveTo(2,c); g.lineTo(198,c); g.stroke();
+    if(!still){sw+=.04; var gr=g.createConicGradient?g.createConicGradient(sw,c,c):null;
+      if(gr){gr.addColorStop(0,'rgba(124,255,154,.5)');gr.addColorStop(.12,'rgba(124,255,154,0)');gr.addColorStop(1,'rgba(124,255,154,0)');g.fillStyle=gr;g.beginPath();g.arc(c,c,98,0,6.283);g.fill();}}
+    blips.forEach(function(b){
+      b.a+=b.s; var x=c+Math.cos(b.a)*b.r*96, y=c+Math.sin(b.a)*b.r*96;
+      g.fillStyle=b.h?'#ffb347':'#7cff9a'; g.beginPath(); g.arc(x,y,b.h?5:4,0,6.283); g.fill();
+    });
+    g.fillStyle='#fff'; g.beginPath(); g.moveTo(c,c-9); g.lineTo(c+7,c+7); g.lineTo(c-7,c+7); g.closePath(); g.fill();
+    if(!still) requestAnimationFrame(radar);
+  }
+
+  $('bCam').addEventListener('click',function(){
+    var b=$('bCam');
+    if(joined){ selfView=!selfView; b.setAttribute('aria-pressed',selfView); refresh(); return; }
+    if(v.classList.contains('cam')){ var s=$('cam').srcObject; if(s) s.getTracks().forEach(function(t){t.stop()}); $('cam').srcObject=null; v.classList.remove('cam'); b.setAttribute('aria-pressed',false); return; }
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false}).then(function(s){
+      $('cam').srcObject=s; v.classList.add('cam'); b.setAttribute('aria-pressed',true);
+    }).catch(function(){ $('msg').textContent='KAMERA: akses ditolak atau halaman bukan HTTPS.'; });
+  });
+  $('bNight').addEventListener('click',function(){var on=v.classList.toggle('night');$('bNight').setAttribute('aria-pressed',on);});
+  $('bFight').addEventListener('click',function(){fight=!fight;$('bFight').setAttribute('aria-pressed',fight);if(fight&&ammo<8)ammo=24;});
+  $('bFull').addEventListener('click',function(){
+    if(v.requestFullscreen){v.requestFullscreen().then(function(){if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(function(){})}).catch(function(){})}
+  });
+
+  /* ---- sensor: goyangan (giroskop), infra merah, gerak ---- */
+  var sx=0, sy=0, swayAmt=0;
+  window.addEventListener('devicemotion',function(e){
+    var r=e.rotationRate; if(!r) return;
+    sx+=((r.gamma||0)*0.12-sx)*.3; sy+=((r.beta||0)*0.12-sy)*.3;
+    sx=Math.max(-7,Math.min(7,sx)); sy=Math.max(-7,Math.min(7,sy));
+    swayAmt=Math.min(1,(Math.abs(r.alpha||0)+Math.abs(r.beta||0)+Math.abs(r.gamma||0))/140);
+  });
+  function applySway(){
+    $('sway').setAttribute('transform','translate('+sx.toFixed(1)+' '+sy.toFixed(1)+')');
+    $('sw').textContent = swayAmt<.15?'STABIL':(swayAmt<.5?'GOYANG':'TIDAK STABIL');
+  }
+  var ir=false, mo=false, proc=document.createElement('canvas'); proc.width=160; proc.height=90;
+  var pc=proc.getContext('2d',{willReadFrequently:true}), tc=$('th').getContext('2d'), mc=$('mo').getContext('2d');
+  var prev=null, last=0, stops=[[0,0,10],[60,0,110],[190,20,80],[255,110,0],[255,220,40],[255,255,230]], pal=[];
+  for(var i=0;i<256;i++){
+    var t=i/255*(stops.length-1), k=Math.min(stops.length-2,Math.floor(t)), f=t-k, a=stops[k], b=stops[k+1];
+    pal.push([a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f]);
+  }
+  function frame(ts){
+    if(!(ir||mo)){ mc.clearRect(0,0,160,90); prev=null; return; }
+    requestAnimationFrame(frame);
+    if(ts-last<80) return; last=ts;
+    var cam=$('cam'); if(!cam.videoWidth) return;
+    pc.drawImage(cam,0,0,160,90);
+    var d=pc.getImageData(0,0,160,90), px=d.data, lum=new Uint8Array(14400), o=null;
+    if(ir) o=tc.createImageData(160,90);
+    for(var i=0,j=0;i<px.length;i+=4,j++){
+      var L=(px[i]*.3+px[i+1]*.59+px[i+2]*.11);
+      lum[j]=L;
+      if(o){ var q=Math.max(0,Math.min(255,Math.round((L-35)/190*255))), c=pal[q]; o.data[i]=c[0];o.data[i+1]=c[1];o.data[i+2]=c[2];o.data[i+3]=255; }
+    }
+    if(o) tc.putImageData(o,0,0);
+    mc.clearRect(0,0,160,90);
+    if(mo && prev){
+      var G=8, W=20, H=11, act=new Uint8Array(W*H), n=0;
+      for(var gy=0;gy<H;gy++) for(var gx=0;gx<W;gx++){
+        var s=0;
+        for(var y=0;y<G;y++){ var yy=gy*G+y; if(yy>=90) break; for(var x=0;x<G;x++){ var ii=yy*160+gx*G+x; s+=Math.abs(lum[ii]-prev[ii]); } }
+        if(s/(G*G)>16){ act[gy*W+gx]=1; n++; }
+      }
+      if(n>W*H*.6){ $('mv').textContent='HP BERGERAK'; }
+      else {
+        var seen=new Uint8Array(W*H), groups=0;
+        for(var s0=0;s0<W*H;s0++){
+          if(!act[s0]||seen[s0]) continue;
+          var st=[s0], x0=99,y0=99,x1=0,y1=0, cnt=0; seen[s0]=1;
+          while(st.length){
+            var u=st.pop(), ux=u%W, uy=(u/W)|0; cnt++;
+            x0=Math.min(x0,ux);x1=Math.max(x1,ux);y0=Math.min(y0,uy);y1=Math.max(y1,uy);
+            [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(dd){
+              var nx=ux+dd[0], ny=uy+dd[1];
+              if(nx>=0&&ny>=0&&nx<W&&ny<H&&act[ny*W+nx]&&!seen[ny*W+nx]){seen[ny*W+nx]=1;st.push(ny*W+nx);}
+            });
+          }
+          if(cnt<2) continue;
+          groups++;
+          mc.strokeStyle='#ffb347'; mc.lineWidth=1.2; mc.strokeRect(x0*G,y0*G,(x1-x0+1)*G,(y1-y0+1)*G);
+          mc.fillStyle='#ffb347'; mc.font='6px sans-serif'; mc.fillText('GERAKAN',x0*G,Math.max(7,y0*G-2));
+        }
+        $('mv').textContent=groups+' TITIK';
+      }
+    }
+    prev=lum;
+  }
+  function withCam(cb){
+    if(v.classList.contains('cam')) return cb();
+    $('bCam').click(); setTimeout(cb,900);
+  }
+  $('bIR').addEventListener('click',function(){
+    ir=!ir; $('bIR').setAttribute('aria-pressed',ir);
+    if(ir){ withCam(function(){ v.classList.add('ir'); $('opt').textContent='INFRA MERAH'; requestAnimationFrame(frame); }); }
+    else { v.classList.remove('ir'); $('opt').textContent='BIASA'; }
+  });
+  $('bMo').addEventListener('click',function(){
+    mo=!mo; $('bMo').setAttribute('aria-pressed',mo);
+    if(mo){ withCam(function(){ v.classList.add('mo-on'); requestAnimationFrame(frame); }); }
+    else { v.classList.remove('mo-on'); $('mv').textContent='OFF'; }
+  });
+
+  /* ---- Helm Link: sambungan ke helm teman (WebRTC) ---- */
+  var ws=null, lstream=null, iceServers=[], peers={}, names={}, infos={}, photos={}, myPhoto='', myRoom='', actx=null, mainId=null, selfView=false, facing='environment', joined=false;
+  function sig(to,data){ ws.send(JSON.stringify({type:'signal',to:to,data:data})); }
+  function showStream(s){ $('cam').srcObject=s; v.classList.add('cam'); }
+  function refresh(){
+    var ids=Object.keys(peers);
+    if(!mainId||!peers[mainId]) mainId=ids[0]||null;
+    var th=$('thumbs'); th.innerHTML='';
+    ids.forEach(function(id){
+      var b=document.createElement('button'); b.textContent=(peers[id].info==='Drone'?'DRONE \u00b7 ':'')+peers[id].name;
+      b.setAttribute('aria-pressed',id===mainId&&!selfView);
+      b.onclick=function(){ mainId=id; selfView=false; $('bCam').setAttribute('aria-pressed',false); refresh(); };
+      th.appendChild(b);
+    });
+    if(selfView||!mainId||!peers[mainId].stream.getTracks().length){ showStream(lstream); $('ut').textContent='UNIT 201'; }
+    else { showStream(peers[mainId].stream); $('ut').textContent=peers[mainId].name.toUpperCase(); }
+  }
+  function addPeer(id,name,init){
+    if(peers[id]) return peers[id];
+    var conn=new RTCPeerConnection({iceServers:iceServers});
+    var p={conn:conn,name:name||names[id]||'Unit',stream:new MediaStream(),pending:[],audio:null,info:infos[id]||'',photo:photos[id]||'',ping:null,lv:0};
+    peers[id]=p;
+    lstream.getTracks().forEach(function(t){conn.addTrack(t,lstream)});
+    conn.onicecandidate=function(e){ if(e.candidate) sig(id,{candidate:e.candidate}); };
+    conn.ontrack=function(e){
+      e.streams[0].getTracks().forEach(function(t){ if(p.stream.getTracks().indexOf(t)<0) p.stream.addTrack(t); });
+      if(!p.audio){ p.audio=document.createElement('audio'); p.audio.autoplay=true; p.audio.srcObject=p.stream; document.body.appendChild(p.audio); }
+      if(e.track.kind==='audio') watchLevel(p);
+      refresh();
+    };
+    conn.onconnectionstatechange=function(){
+      if(conn.connectionState==='connected') $('msg').textContent='LINK: terhubung dengan '+p.name+'.';
+      if(conn.connectionState==='failed') $('msg').textContent='LINK: gagal ke '+p.name+' (mungkin perlu TURN).';
+    };
+    if(init){ conn.createOffer().then(function(o){return conn.setLocalDescription(o)}).then(function(){sig(id,{sdp:conn.localDescription})}); }
+    refresh();
+    return p;
+  }
+  function onSignal(m){
+    names[m.from]=m.name; infos[m.from]=m.info;
+    var p=peers[m.from]||addPeer(m.from,m.name,false), d=m.data, conn=p.conn;
+    if(d.sdp){
+      conn.setRemoteDescription(d.sdp).then(function(){
+        p.pending.forEach(function(c){conn.addIceCandidate(c)}); p.pending=[];
+        if(d.sdp.type==='offer') return conn.createAnswer().then(function(a){return conn.setLocalDescription(a)}).then(function(){sig(m.from,{sdp:conn.localDescription})});
+      }).catch(function(e){$('msg').textContent='LINK: '+e.message;});
+    } else if(d.candidate){
+      if(conn.remoteDescription) conn.addIceCandidate(d.candidate).catch(function(){}); else p.pending.push(d.candidate);
+    }
+  }
+  function connectWs(){
+    ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+    ws.onopen=function(){ ws.send(JSON.stringify({type:'join',room:$('uroom').value,name:$('uname').value||'Unit',info:$('urole').value,photo:myPhoto})); };
+    ws.onmessage=function(e){
+      var m=JSON.parse(e.data);
+      if(m.type==='joined'){
+        myRoom=m.room; $('msg').textContent='LINK: masuk ruangan '+m.room+'.';
+        m.peers.forEach(function(p){names[p.id]=p.name; infos[p.id]=p.info; photos[p.id]=p.photo; addPeer(p.id,p.name,true);});
+      } else if(m.type==='peer-joined'){ names[m.id]=m.name; infos[m.id]=m.info; photos[m.id]=m.photo; $('msg').textContent='LINK: '+m.name+' masuk ruangan.'; }
+      else if(m.type==='signal'){ onSignal(m); }
+      else if(m.type==='peer-left'){
+        var p=peers[m.id]; if(p){ p.conn.close(); if(p.audio) p.audio.remove(); delete peers[m.id]; refresh(); $('msg').textContent='LINK: '+p.name+' keluar.'; }
+      } else if(m.type==='full'){ $('msg').textContent='LINK: ruangan penuh.'; }
+    };
+    ws.onclose=function(){ $('msg').textContent='LINK: koneksi server terputus.'; };
+  }
+  $('bLink').addEventListener('click',function(){
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)(); if(actx.resume) actx.resume();
+    navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:$('urole').value!=='Drone'}).then(function(s){
+      lstream=s; joined=true; document.body.classList.add('live');
+      $('bMic').disabled=false; $('bFlip').disabled=false; $('bCam').textContent='Pandangan saya';
+      showStream(lstream);
+      return fetch('/ice').then(function(r){return r.json()}).catch(function(){return []});
+    }).then(function(servers){ if(!lstream) return; iceServers=servers; connectWs(); })
+    .catch(function(e){ $('msg').textContent='LINK: akses kamera atau mikrofon gagal ('+e.name+').'; });
+  });
+  $('bMic').addEventListener('click',function(){
+    var t=lstream.getAudioTracks()[0]; if(!t) return; t.enabled=!t.enabled;
+    $('bMic').setAttribute('aria-pressed',!t.enabled); $('bMic').textContent=t.enabled?'Matikan mikrofon':'Mikrofon mati';
+  });
+  $('bFlip').addEventListener('click',function(){
+    facing=facing==='environment'?'user':'environment';
+    navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false}).then(function(ns){
+      var nt=ns.getVideoTracks()[0], old=lstream.getVideoTracks()[0];
+      Object.keys(peers).forEach(function(id){ peers[id].conn.getSenders().forEach(function(s){ if(s.track&&s.track.kind==='video') s.replaceTrack(nt); }); });
+      lstream.removeTrack(old); old.stop(); lstream.addTrack(nt); refresh();
+    }).catch(function(){ $('msg').textContent='LINK: kamera lain tidak tersedia.'; });
+  });
+
+  $('uphoto').addEventListener('change',function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    var img=new Image(), url=URL.createObjectURL(f);
+    img.onload=function(){
+      var c=document.createElement('canvas'); c.width=96; c.height=96;
+      var s=Math.min(img.width,img.height), g2=c.getContext('2d');
+      g2.drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,96,96);
+      myPhoto=c.toDataURL('image/jpeg',0.65); URL.revokeObjectURL(url);
+    };
+    img.src=url;
+  });
+  /* ---- frame profil: timbul saat suara masuk, tenggelam saat hening ---- */
+  var speaker=null, speakerUntil=0;
+  var demoUntil=0;
+  function watchLevel(p){
+    if(p.an||!actx) return;
+    try{ var src=actx.createMediaStreamSource(p.stream); p.an=actx.createAnalyser(); p.an.fftSize=256; src.connect(p.an); p.buf=new Uint8Array(p.an.fftSize); }catch(e){}
+  }
+  function initials(n){ return n.split(' ').map(function(w){return w.charAt(0)}).join('').slice(0,2).toUpperCase()||'--'; }
+  var PHOTO_OK=/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/;
+  function renderPf(id,visible,talk){
+    if(Date.now()<demoUntil) return;
+    var pf=$('pf'), p=id&&peers[id];
+    if(!p){ pf.classList.remove('show','talk'); return; }
+    $('pnm').textContent=p.name.toUpperCase();
+    $('prl').textContent=(p.info||'Prajurit').toUpperCase()+' \u00b7 '+(myRoom||'LEGIUN');
+    var av=$('pav');
+    if(p.photo&&PHOTO_OK.test(p.photo)){ av.style.backgroundImage='url('+p.photo+')'; av.textContent=''; }
+    else { av.style.backgroundImage='none'; av.textContent=initials(p.name); }
+    $('pvc').textContent=talk?'MASUK AUDIO':'SELESAI';
+    $('png').textContent=p.ping==null?'-':p.ping+' ms';
+    pf.classList.toggle('talk',!!talk);
+    pf.classList.toggle('show',!!visible);
+  }
+  setInterval(function(){
+    var best=null, bl=0;
+    Object.keys(peers).forEach(function(id){
+      var p=peers[id]; if(!p.an){p.lv=0;return;}
+      p.an.getByteTimeDomainData(p.buf);
+      var s=0; for(var i=0;i<p.buf.length;i++){ var x=(p.buf[i]-128)/128; s+=x*x; }
+      p.lv=Math.sqrt(s/p.buf.length); if(p.lv>bl){bl=p.lv;best=id;}
+    });
+    var now=Date.now(), talking=bl>.03;
+    if(best&&talking){ speaker=best; speakerUntil=now+1800; }
+    var vis=!!(speaker&&peers[speaker]&&now<speakerUntil);
+    renderPf(speaker,vis,talking&&speaker===best);
+  },150);
+  setInterval(function(){
+    Object.keys(peers).forEach(function(id){
+      var p=peers[id];
+      p.conn.getStats().then(function(rep){ rep.forEach(function(r){
+        if(r.type==='candidate-pair'&&r.state==='succeeded'&&r.currentRoundTripTime!=null) p.ping=Math.round(r.currentRoundTripTime*1000);
+      }); }).catch(function(){});
+    });
+  },2000);
+  $('bDemo').addEventListener('click',function(){
+  var pf=$('pf'), av=$('pav');
+  var svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect width='96' height='96' fill='#35402a'/><circle cx='48' cy='40' r='20' fill='#e8941a'/><rect x='22' y='62' width='52' height='40' rx='14' fill='#4b5a3a'/></svg>";
+  demoUntil=Date.now()+4500;
+  $('pnm').textContent='UNIT 07'; $('prl').textContent='MEDIS \u00b7 LEGIUN2';
+  $('pvc').textContent='MASUK AUDIO'; $('png').textContent='42 ms';
+  av.style.backgroundImage='url("data:image/svg+xml,'+encodeURIComponent(svg)+'")'; av.textContent='';
+  pf.classList.add('show','talk');
+  setTimeout(function(){ $('pvc').textContent='SELESAI'; pf.classList.remove('talk'); },2600);
+  setTimeout(function(){ pf.classList.remove('show'); },4200);
+});
+
+  update(); setInterval(update,1000); radar();
+})();
